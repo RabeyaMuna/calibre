@@ -21,7 +21,6 @@ elif 'SKIP_QT_BUILD_TEST' in os.environ:
 
 
 class Handler(http.server.BaseHTTPRequestHandler):
-
     def __init__(self, test_obj, *a):
         self.test_obj = test_obj
         super().__init__(*a)
@@ -75,7 +74,6 @@ class Handler(http.server.BaseHTTPRequestHandler):
 
 @unittest.skipIf(skip, skip)
 class TestFetchBackend(unittest.TestCase):
-
     ae = unittest.TestCase.assertEqual
 
     def setUp(self):
