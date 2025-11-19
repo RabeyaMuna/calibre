@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 
-__license__   = 'GPL v3'
+__license__ = 'GPL v3'
 __copyright__ = '2009, Kovid Goyal <kovid@kovidgoyal.net>'
 __docformat__ = 'restructuredtext en'
 
@@ -24,52 +24,24 @@ else:
     from multiprocessing.connection import Connection
 
 PARALLEL_FUNCS = {
-    'lrfviewer':
-    ('calibre.gui2.lrf_renderer.main', 'main', None),
-
-    'ebook-viewer':
-    ('calibre.gui_launch', 'ebook_viewer', None),
-
-    'ebook-edit':
-    ('calibre.gui_launch', 'gui_ebook_edit', None),
-
-    'store-dialog':
-    ('calibre.gui_launch', 'store_dialog', None),
-
-    'toc-dialog':
-    ('calibre.gui_launch', 'toc_dialog', None),
-
-    'webengine-dialog':
-    ('calibre.gui_launch', 'webengine_dialog', None),
-
-    'render_pages':
-    ('calibre.ebooks.comic.input', 'render_pages', 'notification'),
-
-    'gui_convert':
-    ('calibre.gui2.convert.gui_conversion', 'gui_convert', 'notification'),
-
-    'gui_convert_recipe':
-    ('calibre.gui2.convert.gui_conversion', 'gui_convert_recipe', 'notification'),
-
-    'gui_polish':
-    ('calibre.ebooks.oeb.polish.main', 'gui_polish', None),
-
-    'gui_convert_override':
-    ('calibre.gui2.convert.gui_conversion', 'gui_convert_override', 'notification'),
-
-    'gui_catalog':
-    ('calibre.gui2.convert.gui_conversion', 'gui_catalog', 'notification'),
-
-    'arbitrary':
-    ('calibre.utils.ipc.worker', 'arbitrary', None),
-
-    'arbitrary_n':
-    ('calibre.utils.ipc.worker', 'arbitrary_n', 'notification'),
+    'lrfviewer': ('calibre.gui2.lrf_renderer.main', 'main', None),
+    'ebook-viewer': ('calibre.gui_launch', 'ebook_viewer', None),
+    'ebook-edit': ('calibre.gui_launch', 'gui_ebook_edit', None),
+    'store-dialog': ('calibre.gui_launch', 'store_dialog', None),
+    'toc-dialog': ('calibre.gui_launch', 'toc_dialog', None),
+    'webengine-dialog': ('calibre.gui_launch', 'webengine_dialog', None),
+    'render_pages': ('calibre.ebooks.comic.input', 'render_pages', 'notification'),
+    'gui_convert': ('calibre.gui2.convert.gui_conversion', 'gui_convert', 'notification'),
+    'gui_convert_recipe': ('calibre.gui2.convert.gui_conversion', 'gui_convert_recipe', 'notification'),
+    'gui_polish': ('calibre.ebooks.oeb.polish.main', 'gui_polish', None),
+    'gui_convert_override': ('calibre.gui2.convert.gui_conversion', 'gui_convert_override', 'notification'),
+    'gui_catalog': ('calibre.gui2.convert.gui_conversion', 'gui_catalog', 'notification'),
+    'arbitrary': ('calibre.utils.ipc.worker', 'arbitrary', None),
+    'arbitrary_n': ('calibre.utils.ipc.worker', 'arbitrary_n', 'notification'),
 }
 
 
 class Progress(Thread):
-
     def __init__(self, conn):
         Thread.__init__(self)
         self.daemon = True
@@ -91,7 +63,7 @@ class Progress(Thread):
 
 
 def arbitrary(module_name, func_name, args, kwargs={}):
-    '''
+    """
     An entry point that allows arbitrary functions to be run in a parallel
     process. useful for plugin developers that want to run jobs in a parallel
     process.
@@ -120,29 +92,30 @@ def arbitrary(module_name, func_name, args, kwargs={}):
     :param name: A list (or tuple) of arguments that will be passed to the
     function ``func_name``
     :param kwargs: A dictionary of keyword arguments to pass to func_name
-    '''
+    """
     if module_name.startswith('calibre_plugins'):
         # Initialize the plugin loader by doing this dummy import
         from calibre.customize.ui import find_plugin
+
         find_plugin
     module = importlib.import_module(module_name)
     func = getattr(module, func_name)
     return func(*args, **kwargs)
 
 
-def arbitrary_n(module_name, func_name, args, kwargs={},
-        notification=lambda x, y: y):
-    '''
+def arbitrary_n(module_name, func_name, args, kwargs={}, notification=lambda x, y: y):
+    """
     Same as :func:`arbitrary` above, except that func_name must support a
     keyword argument "notification". This will be a function that accepts two
     arguments. func_name should call it periodically with progress information.
     The first argument is a float between 0 and 1 that represent percent
     completed and the second is a string with a message (it can be an empty
     string).
-    '''
+    """
     if module_name.startswith('calibre_plugins'):
         # Initialize the plugin loader by doing this dummy import
         from calibre.customize.ui import find_plugin
+
         find_plugin
     module = importlib.import_module(module_name)
     func = getattr(module, func_name)
@@ -158,6 +131,7 @@ def get_func(name):
         # Something windows weird happened, try clearing the zip import cache
         # in case the zipfile was changed from under us
         from zipimport import _zip_directory_cache as zdc
+
         zdc.clear()
         module = importlib.import_module(module)
     func = getattr(module, func)
@@ -175,6 +149,7 @@ def main():
         # launch the last run process from the bundle
         # so launch the gui as usual
         from calibre.gui2.main import main as gui_main
+
         return gui_main(['calibre'])
     niceness = os.environ.pop('CALIBRE_WORKER_NICENESS', None)
     if niceness:
