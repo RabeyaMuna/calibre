@@ -653,11 +653,36 @@ class Build(Command):
             cmd += ['-DCMAKE_OSX_ARCHITECTURES=x86_64;arm64']
         if sw and os.path.exists(os.path.join(sw, 'qt')):
             cmd += ['-DCMAKE_SYSTEM_PREFIX_PATH=' + os.path.join(sw, 'qt').replace(os.sep, '/')]
-        os.makedirs(bdir)
+        
+        # Copy headless source to build directory and rewrite placeholders based on Qt version
+        srcdir = os.path.dirname(sources[0])
+        shutil.copytree(srcdir, bdir)
+        
+        # Lazily load qt to get version
+        from setup.build_environment import qt
+        qt_version = qt.get('QT_VERSION', (6, 0))
+        
+        # Determine find_package and link targets based on Qt version
+        if qt_version >= (6, 10):
+            find_gui = 'find_package(Qt6 REQUIRED COMPONENTS Gui GuiPrivate Core CorePrivate)'
+            link_targets = 'Qt6::Gui Qt6::GuiPrivate Qt6::Core Qt6::CorePrivate'
+        else:
+            find_gui = 'find_package(Qt6Gui REQUIRED)'
+            link_targets = 'Qt6::Gui Qt6::GuiPrivate Qt6::Core Qt6::CorePrivate'
+        
+        # Rewrite CMakeLists.txt placeholders
+        cmake_file = os.path.join(bdir, 'CMakeLists.txt')
+        with open(cmake_file, 'r') as f:
+            cmake_content = f.read()
+        cmake_content = cmake_content.replace('__FIND_GUI__', find_gui)
+        cmake_content = cmake_content.replace('__LINK_TARGETS__', link_targets)
+        with open(cmake_file, 'w') as f:
+            f.write(cmake_content)
+        
         cwd = os.getcwd()
         os.chdir(bdir)
         try:
-            self.check_call(cmd + ['-S', os.path.dirname(sources[0])])
+            self.check_call(cmd + ['-S', bdir])
             self.check_call([self.env.make] + [f'-j{cpu_count or 1}'])
         finally:
             os.chdir(cwd)
