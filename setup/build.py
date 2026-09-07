@@ -626,7 +626,7 @@ class Build(Command):
         from setup.parallel_build import cpu_count
         if iswindows or ishaiku:
             return  # Don't have headless operation on these platforms
-        from setup.build_environment import CMAKE, sw
+        from setup.build_environment import CMAKE, sw, qt
         self.info('\n####### Building headless QPA plugin', '#'*7)
         a = absolutize
         headers = a([
@@ -648,6 +648,28 @@ class Build(Command):
         bdir = self.j(self.build_dir, 'headless')
         if os.path.exists(bdir):
             shutil.rmtree(bdir)
+
+        # Rewrite CMakeLists.txt based on Qt version
+        cmake_file = os.path.join(os.path.dirname(sources[0]), 'CMakeLists.txt')
+        with open(cmake_file, 'r') as f:
+            cmake_content = f.read()
+
+        qt_version = qt.get('version', (0, 0))
+        if qt_version >= (6, 10):
+            # Qt >= 6.10 uses Qt6::GuiPrivate
+            find_gui = 'find_package(Qt6 REQUIRED COMPONENTS Gui GuiPrivate Core CorePrivate)'
+            link_targets = 'Qt::Gui Qt::GuiPrivate Qt::Core Qt::CorePrivate'
+        else:
+            # Qt < 6.10 uses Qt5::Gui or Qt6::Gui without Private
+            find_gui = 'find_package(Qt6 REQUIRED COMPONENTS Gui Core)'
+            link_targets = 'Qt::Gui Qt::Core'
+
+        cmake_content = cmake_content.replace('__FIND_GUI__', find_gui)
+        cmake_content = cmake_content.replace('__LINK_TARGETS__', link_targets)
+
+        with open(cmake_file, 'w') as f:
+            f.write(cmake_content)
+
         cmd = [CMAKE]
         if is_macos_universal_build:
             cmd += ['-DCMAKE_OSX_ARCHITECTURES=x86_64;arm64']
