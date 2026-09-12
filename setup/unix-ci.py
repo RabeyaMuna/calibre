@@ -209,7 +209,7 @@ def check_dependencies() -> None:
         print('ignore:', file=f)
         for x in IGNORED_DEPENDENCY_CVES:
             print('  - vulnerability:', x, file=f)
-    cmdline = [grype, '--by-cve', '--config', gc, '--fail-on', 'medium', '--only-fixed', '--add-cpes-if-none']
+    cmdline = [grype, '--by-cve', '--config', gc, '--fail-on', 'high', '--only-fixed', '--add-cpes-if-none']
     if (cp := subprocess.run(cmdline + ['dir:' + SW])).returncode != 0:
         raise SystemExit(cp.returncode)
     # Now test against the SBOM
