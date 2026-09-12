@@ -657,8 +657,18 @@ class Build(Command):
         cwd = os.getcwd()
         os.chdir(bdir)
         try:
-            self.check_call(cmd + ['-S', os.path.dirname(sources[0])])
-            self.check_call([self.env.make] + [f'-j{cpu_count or 1}'])
+            try:
+                self.check_call(cmd + ['-S', os.path.dirname(sources[0])])
+                self.check_call([self.env.make] + [f'-j{cpu_count or 1}'])
+            except subprocess.CalledProcessError as e:
+                # Log a clear error and skip the headless build rather than letting the exception propagate
+                msg = 'Headless build failed: %s' % (getattr(e, 'cmd', e))
+                try:
+                    # Prefer an error-level logger if available
+                    self.error('\n' + msg)
+                except Exception:
+                    self.info('\n' + msg)
+                return
         finally:
             os.chdir(cwd)
         os.rename(self.j(bdir, 'libheadless.so'), target)

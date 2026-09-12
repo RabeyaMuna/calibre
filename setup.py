@@ -113,7 +113,46 @@ def main(args=sys.argv):
             getattr(commands, cmd).clean()
         return 0
 
-    command.run_all(opts)
+    # Preflight check for required Qt components (e.g. Qt::GuiPrivate)
+    # Try several heuristics: pkg-config check for common Qt packages and common env vars
+    import shutil, subprocess, os
+
+    def _qt_available():
+        # pkg-config names vary; try common variants
+        if shutil.which('pkg-config'):
+            for name in ('Qt6Gui', 'Qt5Gui', 'QtGui'):
+                try:
+                    subprocess.check_call(['pkg-config', '--exists', name],
+                                          stdout=subprocess.DEVNULL,
+                                          stderr=subprocess.DEVNULL)
+                    return True
+                except subprocess.CalledProcessError:
+                    continue
+                except OSError:
+                    break
+        # common environment variables pointing to Qt installations
+        for var in ('Qt_DIR', 'QTDIR', 'QT_DIR'):
+            if os.environ.get(var):
+                return True
+        return False
+
+    if not _qt_available():
+        print('\nError: Required Qt components (including Qt::GuiPrivate) not found.')
+        print('Please install/configure Qt and ensure Qt_DIR or pkg-config paths are set.')
+        print('On many systems you can install Qt dev packages or set the Qt_DIR environment variable to the Qt CMake directory.')
+        return 1
+
+    try:
+        command.run_all(opts)
+    except subprocess.CalledProcessError as e:
+        print()
+        prints('Error: external command failed with return code', getattr(e, 'returncode', '<unknown>'))
+        prints('Failed command:', getattr(e, 'cmd', '<unknown>'))
+        return 2
+    except Exception as e:
+        print()
+        prints('Unexpected error while running command:', e)
+        return 3
 
     warnings = get_warnings()
     if warnings:
