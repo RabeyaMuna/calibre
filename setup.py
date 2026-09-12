@@ -113,7 +113,18 @@ def main(args=sys.argv):
             getattr(commands, cmd).clean()
         return 0
 
-    command.run_all(opts)
+    try:
+        command.run_all(opts)
+    except subprocess.CalledProcessError as e:
+        # Provide a clear error message and return a controlled non-zero exit code
+        print()
+        try:
+            rc = e.returncode
+        except Exception:
+            rc = 1
+        prints('Error: build command failed with return code', rc)
+        prints('Command output:', str(e))
+        return rc
 
     warnings = get_warnings()
     if warnings:
