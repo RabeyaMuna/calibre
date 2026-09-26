@@ -28,15 +28,22 @@ class Writer:
         return b
 
     def asdatadict(self):
-        return {k: v.getvalue() for k, v in self.outputs.items()}
+        data = {k: v.getvalue() for k, v in self.outputs.items()}
+        for v in self.outputs.values():
+            v.close()
+        return data
 
 
 def read_file(archive, name):
     w = Writer()
     archive.extract(targets=[name], factory=w)
-    for v in w.outputs.values():
-        return v.getvalue()
-    raise KeyError(f'No file named {name} in archive')
+    try:
+        for v in w.outputs.values():
+            return v.getvalue()
+        raise KeyError(f'No file named {name} in archive')
+    finally:
+        for v in w.outputs.values():
+            v.close()
 
 
 def extract_member(path_or_stream, match=None, name=None):

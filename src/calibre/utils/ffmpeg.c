@@ -240,12 +240,12 @@ open_output_file(Transcoder *t) {
     av_channel_layout_default(&t->enc_ctx->ch_layout, t->dec_ctx->ch_layout.nb_channels);
     t->enc_ctx->sample_rate = t->dec_ctx->sample_rate;
     int ret;
-#if LIBAVCODEC_VERSION_MAJOR >= 61 && LIBAVCODEC_VERSION_MINOR >= 14
+#if LIBAVCODEC_VERSION_MAJOR >= 61
     const enum AVSampleFormat *sample_fmts = NULL;
     ret = avcodec_get_supported_config(t->dec_ctx, output_codec, AV_CODEC_CONFIG_SAMPLE_FORMAT, 0, (const void**)&sample_fmts, NULL);
     t->enc_ctx->sample_fmt = (ret >= 0 && sample_fmts) ? sample_fmts[0] : t->dec_ctx->sample_fmt;
 #else
-    t->enc_ctx->sample_fmt = output_codec->sample_fmts[0];
+    t->enc_ctx->sample_fmt = t->dec_ctx->sample_fmt;
 #endif
     t->enc_ctx->bit_rate = t->output_bitrate;
     if (!t->enc_ctx->bit_rate) {

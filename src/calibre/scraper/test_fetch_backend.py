@@ -89,6 +89,7 @@ class TestFetchBackend(unittest.TestCase):
 
     def tearDown(self):
         self.server.shutdown()
+        self.server.server_close()
         self.server_thread.join(5)
 
     def test_recipe_browser_qt(self):
