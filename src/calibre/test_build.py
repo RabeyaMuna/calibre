@@ -100,7 +100,10 @@ class BuildTest(unittest.TestCase):
         lzma.open
 
     def test_zstd(self):
-        from pyzstd import compress, decompress
+        try:
+            from pyzstd import compress, decompress
+        except ImportError:
+            raise unittest.SkipTest('pyzstd module not available')
         data = os.urandom(4096)
         cdata = compress(data)
         self.assertEqual(data, decompress(cdata))

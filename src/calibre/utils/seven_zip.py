@@ -18,13 +18,22 @@ def names(path_or_stream):
         return tuple(zf.getnames())
 
 
+class _UncloseableBytesIO(io.BytesIO):
+    # A BytesIO wrapper that prevents py7zr from prematurely closing the buffer.
+    def close(self):
+        pass
+
+    def real_close(self):
+        io.BytesIO.close(self)
+
+
 class Writer:
 
     def __init__(self):
         self.outputs = {}
 
     def create(self, filename):
-        b = self.outputs[filename] = io.BytesIO()
+        b = self.outputs[filename] = _UncloseableBytesIO()
         return b
 
     def asdatadict(self):

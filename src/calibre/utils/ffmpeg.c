@@ -244,6 +244,8 @@ open_output_file(Transcoder *t) {
     const enum AVSampleFormat *sample_fmts = NULL;
     ret = avcodec_get_supported_config(t->dec_ctx, output_codec, AV_CODEC_CONFIG_SAMPLE_FORMAT, 0, (const void**)&sample_fmts, NULL);
     t->enc_ctx->sample_fmt = (ret >= 0 && sample_fmts) ? sample_fmts[0] : t->dec_ctx->sample_fmt;
+#elif LIBAVCODEC_VERSION_MAJOR >= 59
+    t->enc_ctx->sample_fmt = t->dec_ctx->sample_fmt;
 #else
     t->enc_ctx->sample_fmt = output_codec->sample_fmts[0];
 #endif

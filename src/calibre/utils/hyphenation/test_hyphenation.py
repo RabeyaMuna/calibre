@@ -38,6 +38,10 @@ class TestHyphenation(unittest.TestCase):
         path_to_dictionary.cache_dir = None
 
     def test_locale_to_hyphen_dictionary(self):
+        try:
+            dictionary_name_for_locale('en')
+        except Exception:
+            raise unittest.SkipTest('Hyphenation locale resources not available')
 
         def t(x, expected=None):
             self.ae(
