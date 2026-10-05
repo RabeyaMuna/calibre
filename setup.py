@@ -8,6 +8,7 @@ __docformat__ = 'restructuredtext en'
 
 import os
 import re
+import subprocess
 import sys
 
 src_base = os.path.dirname(os.path.abspath(__file__))
@@ -113,7 +114,11 @@ def main(args=sys.argv):
             getattr(commands, cmd).clean()
         return 0
 
-    command.run_all(opts)
+    try:
+        command.run_all(opts)
+    except subprocess.CalledProcessError as e:
+        prints('Error:', e)
+        return e.returncode or 1
 
     warnings = get_warnings()
     if warnings:
