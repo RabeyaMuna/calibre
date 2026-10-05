@@ -39,6 +39,8 @@ class Worker(Thread):
                 self.working = False
             try:
                 self.notify_server()
+            except (OSError, ValueError):
+                pass
             except Exception:
                 self.log.exception('ServerWorker failed to notify server on job completion')
 
@@ -64,10 +66,13 @@ class ThreadPool:
 
     def stop(self, wait_till):
         for w in self.workers:
-            try:
-                self.request_queue.put_nowait(None)
-            except Full:
-                break
+            while True:
+                try:
+                    self.request_queue.put_nowait(None)
+                    break
+                except Full:
+                    if not w.is_alive():
+                        break
         for w in self.workers:
             now = monotonic()
             if now >= wait_till:

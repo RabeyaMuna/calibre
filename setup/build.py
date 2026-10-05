@@ -617,6 +617,14 @@ class Build(Command):
         '''
         try:
             subprocess.check_call(*args, **kwargs)
+        except subprocess.CalledProcessError as e:
+            cmdline = ' '.join([f'"{arg}"' if ' ' in arg else arg for arg in args[0]])
+            print(f'Error while executing: {cmdline}\n')
+            if e.stdout:
+                print(e.stdout)
+            if e.stderr:
+                print(e.stderr)
+            raise
         except Exception:
             cmdline = ' '.join([f'"{arg}"' if ' ' in arg else arg for arg in args[0]])
             print(f'Error while executing: {cmdline}\n')
