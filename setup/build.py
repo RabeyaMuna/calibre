@@ -653,6 +653,8 @@ class Build(Command):
             cmd += ['-DCMAKE_OSX_ARCHITECTURES=x86_64;arm64']
         if sw and os.path.exists(os.path.join(sw, 'qt')):
             cmd += ['-DCMAKE_SYSTEM_PREFIX_PATH=' + os.path.join(sw, 'qt').replace(os.sep, '/')]
+        # Disable linking to Qt private libraries that may not be available
+        cmd += ['-DQT_NO_LINK_PRIVATE=ON']
         os.makedirs(bdir)
         cwd = os.getcwd()
         os.chdir(bdir)
