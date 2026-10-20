@@ -167,6 +167,13 @@ IGNORED_DEPENDENCY_CVES = [
     # Python stdlib
     'CVE-2025-8194',  # DoS in tarfile
     'CVE-2025-6069',  # DoS in HTMLParser
+    'CVE-2025-6075',  # Python: buffer overflow in os.path.expandvars on Windows, not applicable
+    # SQLite3
+    'CVE-2025-3277',  # SQLite3: integer overflow in concat_ws, not exploitable in calibre usage
+    'CVE-2025-6965',  # SQLite3: integer overflow in sqlite3_snprintf, not exploitable in calibre usage
+    'CVE-2025-29087',  # SQLite3: integer overflow in concat_ws, not exploitable in calibre usage
+    # Qt6
+    'CVE-2025-5683',  # Qt6: QTextDocument OOB read, not exploitable in calibre usage
     # glib
     'CVE-2025-4056',  # Only affects Windows, on which we dont use glib
     # libtiff
