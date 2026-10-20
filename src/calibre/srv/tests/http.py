@@ -205,6 +205,7 @@ class TestHTTP(BaseTest):
             conn.request('GET', '/test/')
             r = conn.getresponse()
             self.ae(r.status, http_client.INTERNAL_SERVER_ERROR)
+            r.read()  # Consume the response body to avoid leaving the connection in an inconsistent state
 
             # Test 301
             def handler(data):

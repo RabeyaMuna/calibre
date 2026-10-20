@@ -80,10 +80,14 @@ class TestFetchBackend(unittest.TestCase):
 
     def setUp(self):
         self.server_started = Event()
+        self.server_error = None
         self.server_thread = Thread(target=self.run_server, daemon=True)
         self.server_thread.start()
         if not self.server_started.wait(15):
-            raise Exception('Test server failed to start')
+            if self.server_error:
+                raise Exception(f'Test server failed to start: {self.server_error}')
+            else:
+                raise Exception('Test server failed to start (timeout)')
         self.request_count = 0
         self.dont_send_response = self.dont_send_body = False
 
@@ -182,11 +186,15 @@ class TestFetchBackend(unittest.TestCase):
             ans = Handler(self, *a)
             return ans
 
-        with ThreadingHTTPServer(('', 0), create_handler) as httpd:
-            self.server = httpd
-            self.port = httpd.server_address[1]
-            self.server_started.set()
-            httpd.serve_forever()
+        try:
+            with ThreadingHTTPServer(('', 0), create_handler) as httpd:
+                self.server = httpd
+                self.port = httpd.server_address[1]
+                self.server_started.set()
+                httpd.serve_forever()
+        except Exception as e:
+            self.server_error = str(e)
+            raise
 
 
 def find_tests():

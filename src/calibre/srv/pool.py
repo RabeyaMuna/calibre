@@ -37,13 +37,15 @@ class Worker(Thread):
                 self.result_queue.put((job_id, True, result))
             finally:
                 self.working = False
-            try:
-                self.notify_server()
-            except Exception:
-                self.log.exception('ServerWorker failed to notify server on job completion')
+                try:
+                    self.notify_server()
+                except Exception:
+                    self.log.exception('ServerWorker failed to notify server on job completion')
 
     def handle_error(self, job_id):
-        self.result_queue.put((job_id, False, sys.exc_info()))
+        import sys
+        exc_info = sys.exc_info()
+        self.result_queue.put((job_id, False, exc_info[1]))
 
 
 class ThreadPool:
@@ -109,6 +111,8 @@ class PluginPool:
             w.start()
 
     def stop(self, wait_till):
+        from time import monotonic
+        start = monotonic()
         for w in self.workers:
             if w.is_alive():
                 try:
