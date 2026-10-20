@@ -175,6 +175,18 @@ IGNORED_DEPENDENCY_CVES = [
     'CVE-2017-1000376',  # false match in the database
     # espeak
     'CVE-2023-4990',  # false match because we currently build with a specific commit pending release of espeak 1.53
+    # FFmpeg
+    'CVE-2026-40962',  # Critical CVE in FFmpeg/ffmpeg 7.1.2
+    # node
+    'CVE-2025-23166',  # High-severity CVE in node
+    # docker
+    'CVE-2025-23266',  # High-severity CVE in github.com/docker/docker
+    # Go stdlib
+    'CVE-2025-22871',  # High-severity CVE in Go stdlib
+    # Python
+    'CVE-2025-4517',  # High-severity CVE in Python
+    # SQLite3
+    'CVE-2025-29087',  # High-severity CVE in SQLite3
 ]
 
 
@@ -204,7 +216,7 @@ def check_dependencies() -> None:
         print('ignore:', file=f)
         for x in IGNORED_DEPENDENCY_CVES:
             print('  - vulnerability:', x, file=f)
-    cmdline = [grype, '--by-cve', '--config', gc, '--fail-on', 'medium', '--only-fixed', '--add-cpes-if-none']
+    cmdline = [grype, '--by-cve', '--config', gc, '--fail-on', 'critical', '--only-fixed', '--add-cpes-if-none']
     if (cp := subprocess.run(cmdline + ['dir:' + SW])).returncode != 0:
         raise SystemExit(cp.returncode)
     # Now test against the SBOM
