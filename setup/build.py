@@ -670,6 +670,10 @@ class Build(Command):
             abi_version = f'abi-version = "{pyqt_sip_abi_version()}"'
         sipf = ext.sip_files[0]
         needs_exceptions = 'true' if ext.needs_exceptions else 'false'
+        cxxflags = self.env.base_cxxflags
+        if ismacos and ext.name == 'rcc_backend':
+            compat_header = os.path.join(SRC, 'calibre', 'utils', 'rcc', 'macos_compat.h')
+            cxxflags = [*cxxflags, '-include', compat_header]
         with open(os.path.join(src_dir, 'pyproject.toml'), 'w') as f:
             f.write(f'''
 [build-system]
@@ -692,7 +696,7 @@ qmake-settings = [
     """QMAKE_CXX = {self.env.cxx}""",
     """QMAKE_LINK = {self.env.linker or self.env.cxx}""",
     """QMAKE_CFLAGS += {shlex.join(self.env.base_cflags)}""",
-    """QMAKE_CXXFLAGS += {shlex.join(self.env.base_cxxflags)}""",
+    """QMAKE_CXXFLAGS += {shlex.join(cxxflags)}""",
     """QMAKE_LFLAGS += {shlex.join(self.env.base_ldflags)}""",
 ]
 
