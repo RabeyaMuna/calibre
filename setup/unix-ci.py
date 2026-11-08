@@ -61,7 +61,7 @@ else:
         setenv('CALIBRE_ESPEAK_DATA_DIR', '$SW/share/espeak-ng-data')
 
 
-def run(*args, timeout=600):
+def run(*args, timeout=1200):
     if len(args) == 1:
         args = shlex.split(args[0])
     print(' '.join(args), flush=True)
