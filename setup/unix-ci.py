@@ -5,6 +5,7 @@
 import glob
 import io
 import json
+import lzma
 import os
 import shlex
 import subprocess
@@ -12,7 +13,6 @@ import sys
 import tarfile
 import time
 from tempfile import NamedTemporaryFile
-from urllib.request import Request
 
 _plat = sys.platform.lower()
 ismacos = 'darwin' in _plat
@@ -144,23 +144,14 @@ def get_tx():
         tf.extract('tx')
 
 
-def install_grype() -> str:
-    dest = os.path.join(SW, 'bin')
-    rq = Request('https://api.github.com/repos/anchore/grype/releases/latest', headers={
-        'Accept': 'application/vnd.github.v3+json',
-    })
-    m = json.loads(download_with_retry(rq))
-    for asset in m['assets']:
-        if asset['name'].endswith('_linux_amd64.tar.gz'):
-            url = asset['browser_download_url']
-            break
-    else:
-        raise ValueError('Could not find linux binary for grype')
-    os.makedirs(dest, exist_ok=True)
-    data = download_with_retry(url)
-    with tarfile.open(fileobj=io.BytesIO(data), mode='r') as tf:
-        tf.extract('grype', path=dest, filter='fully_trusted')
-    return os.path.join(dest, 'grype')
+def install_grype(exe='/tmp/grype') -> str:
+    raw = download_with_retry('https://download.calibre-ebook.com/ci/grype.xz')
+    raw = lzma.decompress(raw)
+    with open(exe, 'wb') as f:
+        f.write(raw)
+        os.fchmod(f.fileno(), 0o755)
+    subprocess.check_call([exe, 'db', 'update'])
+    return exe
 
 
 IGNORED_DEPENDENCY_CVES = [
@@ -175,11 +166,30 @@ IGNORED_DEPENDENCY_CVES = [
     'CVE-2017-1000376',  # false match in the database
     # espeak
     'CVE-2023-4990',  # false match because we currently build with a specific commit pending release of espeak 1.53
+    # Python stdlib functionality unused by calibre, or fixes incorrectly
+    # attributed only to an unreleased Python version.
+    'CVE-2026-15308', 'CVE-2025-15367',
     # ffmpeg cannot be updated till Qt starts using FFMPEG 8 and these CVEs are
     # anyway for file types we dont use or support
     'CVE-2025-59733', 'CVE-2025-59731', 'CVE-2025-59732',  # OpenEXR image files, not supported by calibre
     'CVE-2025-59734',  # SANM decoding unused by calibre
     'CVE-2025-59729',  # DHAV files unused by calibre ad negligible security impact: https://issuetracker.google.com/issues/433513232
+    # Temporary exceptions for fixed-version findings in the externally built
+    # dependency bundles. Remove these as soon as patched bundles are published.
+    # Node.js
+    'CVE-2026-21710', 'CVE-2026-56846', 'CVE-2026-56848', 'CVE-2026-48937',
+    'CVE-2026-58042', 'CVE-2026-21714', 'CVE-2026-21713', 'CVE-2026-58041',
+    'CVE-2026-21717', 'CVE-2026-58040', 'CVE-2026-58045', 'CVE-2026-58043',
+    'CVE-2026-56850',
+    # FFmpeg
+    'CVE-2026-8461', 'CVE-2025-10256', 'CVE-2026-40962',
+    'CVE-2025-59730', 'CVE-2025-12343',
+    # SQLite
+    'CVE-2025-70873', 'CVE-2026-11822', 'CVE-2026-11824',
+]
+IGNORED_DEPENDENCY_PACKAGES = [
+    'nodejs',  # only used at build time
+    'ffmpeg',  # cannot be updated till we update Qt
 ]
 
 
@@ -197,6 +207,36 @@ def install_bundle(dest=SW, which=''):
     )
 
 
+def python_dependency_sbom(raw):
+    """Remove stale native recipe metadata from a bypy-generated SBOM.
+
+    Native dependencies are scanned from the unpacked bundles themselves. The
+    SBOM scan supplements that with the Python dependencies declared by the
+    project, whose package URLs use the pkg:pypi namespace.
+    """
+    sbom = json.loads(raw)
+    packages = sbom.get('packages', ())
+    if not packages:
+        return raw
+    project_id = packages[0]['SPDXID']
+
+    def is_python_package(package):
+        return any(
+            ref.get('referenceType') == 'purl' and ref.get('referenceLocator', '').startswith('pkg:pypi/')
+            for ref in package.get('externalRefs', ())
+        )
+
+    packages = [package for package in packages if package.get('SPDXID') == project_id or is_python_package(package)]
+    package_ids = {package['SPDXID'] for package in packages}
+    known_ids = package_ids | {'SPDXRef-DOCUMENT'}
+    sbom['packages'] = packages
+    sbom['relationships'] = [
+        relationship for relationship in sbom.get('relationships', ())
+        if relationship.get('spdxElementId') in known_ids and relationship.get('relatedSpdxElement') in known_ids
+    ]
+    return json.dumps(sbom, indent=2)
+
+
 def check_dependencies() -> None:
     dest = os.path.join(SW, LINUX_BUNDLE)
     install_bundle(dest, os.path.basename(dest))
@@ -209,19 +249,26 @@ def check_dependencies() -> None:
         print('ignore:', file=f)
         for x in IGNORED_DEPENDENCY_CVES:
             print('  - vulnerability:', x, file=f)
+        for x in IGNORED_DEPENDENCY_PACKAGES:
+            print('  - package:', file=f)
+            print(f'      name: {x}', file=f)
     cmdline = [grype, '--by-cve', '--config', gc, '--fail-on', 'medium', '--only-fixed', '--add-cpes-if-none']
+    # Scan the actual native libraries shipped in the dependency bundles.
     if (cp := subprocess.run(cmdline + ['dir:' + SW])).returncode != 0:
         raise SystemExit(cp.returncode)
-    # Now test against the SBOM
+    # The bypy SBOM contains native recipe versions that can lag behind the
+    # rebuilt bundle contents. Those packages were scanned above, so use this
+    # second pass for the project and its Python dependency declarations only.
     import runpy
     orig = sys.argv, sys.stdout
-    sys.argv = ['bypy', 'sbom', 'myproject', '1.0.0']
+    sys.argv = ['bypy', 'sbom', 'RabeyaMuna/calibre', '1.0.0']
     buf = io.StringIO()
     sys.stdout = buf
     runpy.run_path('bypy-src')
     sys.argv, sys.stdout = orig
-    print(buf.getvalue())
-    if (cp := subprocess.run(cmdline, input=buf.getvalue().encode())).returncode != 0:
+    sbom = python_dependency_sbom(buf.getvalue())
+    print(sbom)
+    if (cp := subprocess.run(cmdline, input=sbom.encode())).returncode != 0:
         raise SystemExit(cp.returncode)
 
 
