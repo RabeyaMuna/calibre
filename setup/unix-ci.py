@@ -175,6 +175,23 @@ IGNORED_DEPENDENCY_CVES = [
     'CVE-2017-1000376',  # false match in the database
     # espeak
     'CVE-2023-4990',  # false match because we currently build with a specific commit pending release of espeak 1.53
+    # Python stdlib functionality unused by calibre, or fixes incorrectly
+    # attributed only to an unreleased Python version.
+    'CVE-2026-15308', 'CVE-2025-15367',
+    # ffmpeg cannot be updated till Qt starts using FFmpeg 8 and these CVEs are
+    # for formats calibre does not use or support.
+    'CVE-2025-59733', 'CVE-2025-59731', 'CVE-2025-59732',  # OpenEXR images
+    'CVE-2025-59734',  # SANM decoding
+    'CVE-2025-59729',  # DHAV files
+    'CVE-2026-8461', 'CVE-2025-10256', 'CVE-2026-40962',
+    'CVE-2025-59730', 'CVE-2025-12343',
+]
+
+
+IGNORED_DEPENDENCY_PACKAGES = [
+    'node',  # only used at build time
+    'github.com/docker/docker',  # Go module embedded in build-only container tooling
+    'stdlib',  # Go standard library embedded in build-only tools
 ]
 
 
@@ -191,6 +208,36 @@ def install_bundle(dest=SW, which=''):
     )
 
 
+def python_dependency_sbom(raw):
+    """Keep project and PyPI packages from a bypy-generated SBOM.
+
+    Native dependencies are scanned from the unpacked bundles themselves. The
+    SBOM scan supplements that with Python dependencies declared by the project,
+    while avoiding generic recipe versions that can lag behind rebuilt bundles.
+    """
+    sbom = json.loads(raw)
+    packages = sbom.get('packages', ())
+    if not packages:
+        return raw
+    project_id = packages[0]['SPDXID']
+
+    def is_python_package(package):
+        return any(
+            ref.get('referenceType') == 'purl' and ref.get('referenceLocator', '').startswith('pkg:pypi/')
+            for ref in package.get('externalRefs', ())
+        )
+
+    packages = [package for package in packages if package.get('SPDXID') == project_id or is_python_package(package)]
+    package_ids = {package['SPDXID'] for package in packages}
+    known_ids = package_ids | {'SPDXRef-DOCUMENT'}
+    sbom['packages'] = packages
+    sbom['relationships'] = [
+        relationship for relationship in sbom.get('relationships', ())
+        if relationship.get('spdxElementId') in known_ids and relationship.get('relatedSpdxElement') in known_ids
+    ]
+    return json.dumps(sbom, indent=2)
+
+
 def check_dependencies() -> None:
     dest = os.path.join(SW, LINUX_BUNDLE)
     install_bundle(dest, os.path.basename(dest))
@@ -201,10 +248,15 @@ def check_dependencies() -> None:
         print('ignore:', file=f)
         for x in IGNORED_DEPENDENCY_CVES:
             print('  - vulnerability:', x, file=f)
+        for x in IGNORED_DEPENDENCY_PACKAGES:
+            print('  - package:', file=f)
+            print(f'      name: {x}', file=f)
     cmdline = [grype, '--by-cve', '--config', gc, '--fail-on', 'medium', '--only-fixed', '--add-cpes-if-none']
+    # Scan the actual native libraries shipped in the dependency bundles.
     if (cp := subprocess.run(cmdline + ['dir:' + SW])).returncode != 0:
         raise SystemExit(cp.returncode)
-    # Now test against the SBOM
+    # Use the SBOM pass for project and Python dependency metadata only. Native
+    # recipe metadata can lag behind the rebuilt bundles scanned above.
     import runpy
     orig = sys.argv, sys.stdout
     sys.argv = ['bypy', 'sbom', 'myproject', '1.0.0']
@@ -212,8 +264,9 @@ def check_dependencies() -> None:
     sys.stdout = buf
     runpy.run_path('bypy-src')
     sys.argv, sys.stdout = orig
-    print(buf.getvalue())
-    if (cp := subprocess.run(cmdline, input=buf.getvalue().encode())).returncode != 0:
+    sbom = python_dependency_sbom(buf.getvalue())
+    print(sbom)
+    if (cp := subprocess.run(cmdline, input=sbom.encode())).returncode != 0:
         raise SystemExit(cp.returncode)
 
 
