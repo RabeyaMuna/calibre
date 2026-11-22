@@ -653,6 +653,7 @@ class Build(Command):
             cmd += ['-DCMAKE_OSX_ARCHITECTURES=x86_64;arm64']
         if sw and os.path.exists(os.path.join(sw, 'qt')):
             cmd += ['-DCMAKE_SYSTEM_PREFIX_PATH=' + os.path.join(sw, 'qt').replace(os.sep, '/')]
+        cmd += ['-DCMAKE_PREFIX_PATH=' + os.path.join(sw, 'qt').replace(os.sep, '/')]  # Ensure Qt components are found
         os.makedirs(bdir)
         cwd = os.getcwd()
         os.chdir(bdir)
